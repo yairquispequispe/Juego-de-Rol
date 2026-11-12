@@ -68,15 +68,26 @@ class Aventura:
             (objeto,),
         )
         if self.cursor.fetchone():
-            print(f"\nYa llevas {objeto.lower()} contigo.")
-            return
+            print("\nYa habías recogido ese objeto; aquí ya no queda.")
+            return False
 
         self.cursor.execute(
             "INSERT INTO inventario (objeto) VALUES (?)",
             (objeto,),
         )
         self.conexion.commit()
-        print(f"\nGuardas con cuidado: {objeto}.")
+        nombres = {
+            "Llave antigua": "la llave antigua",
+            "Cristal azul": "el cristal azul",
+            "Cuerda": "la cuerda",
+            "Mapa antiguo": "el mapa antiguo",
+        }
+        nombre_objeto = nombres.get(objeto, objeto.lower())
+        print(
+            f"\n¡Has recogido {nombre_objeto}! "
+            "El lugar donde estaba ahora está vacío."
+        )
+        return True
 
     def _objetos_del_jugador(self):
         self.cursor.execute("SELECT objeto FROM inventario")
@@ -250,23 +261,47 @@ class Aventura:
                 escena = {"1": "cueva", "2": "rio", "3": "torre"}[eleccion]
 
             elif escena == "cueva":
-                print("\nLa cueva está oscura, pero algo brilla entre las rocas.")
-                opciones = {
-                    "1": "Recoger la llave antigua",
-                    "2": "Recoger el cristal azul",
-                    "3": "Dejar los objetos donde están",
-                }
+                objetos = self._objetos_del_jugador()
+                objetos_cueva = [
+                    ("Llave antigua", "la llave antigua", "Recoger la llave antigua"),
+                    ("Cristal azul", "el cristal azul", "Recoger el cristal azul"),
+                ]
+                disponibles = [
+                    (objeto, descripcion)
+                    for objeto, _nombre, descripcion in objetos_cueva
+                    if objeto not in objetos
+                ]
+                if disponibles:
+                    print("\nLa cueva está oscura y algo brilla entre las rocas.")
+                    for objeto, nombre_objeto, _descripcion in objetos_cueva:
+                        if objeto in objetos:
+                            print(
+                                f"El hueco de {nombre_objeto} está vacío: "
+                                "ese objeto ya forma parte de tu inventario."
+                            )
+                else:
+                    print("\nLa cueva está vacía: ya recogiste todo lo que había.")
+
+                opciones = {}
+                objetos_por_opcion = {}
+                for numero, (objeto, descripcion) in enumerate(disponibles, start=1):
+                    opcion = str(numero)
+                    opciones[opcion] = descripcion
+                    objetos_por_opcion[opcion] = objeto
+                opcion_volver = str(len(opciones) + 1)
+                opciones[opcion_volver] = "Volver al bosque"
+
                 eleccion = self._elegir_opcion(opciones)
                 if eleccion == "0":
                     self._guardar_escena(escena)
                     print("\nTu progreso quedó a salvo. Te espero cuando quieras volver.")
                     return
                 self._guardar_decision(opciones[eleccion], escena)
-                if eleccion == "1":
-                    self._agregar_objeto("Llave antigua")
-                elif eleccion == "2":
-                    self._agregar_objeto("Cristal azul")
-                print("\nDespués de explorar, vuelves al bosque.")
+                if eleccion in objetos_por_opcion:
+                    self._agregar_objeto(objetos_por_opcion[eleccion])
+                    print("\nDespués de explorar, vuelves al bosque.")
+                else:
+                    print("\nDecides dejar lo que queda y vuelves al bosque.")
                 escena = "bosque"
 
             elif escena == "rio":
@@ -285,34 +320,42 @@ class Aventura:
 
             elif escena == "refugio":
                 print("\nEncuentras una cabaña acogedora, abandonada hace mucho tiempo.")
-                print("Junto a la puerta hay una cuerda bien conservada.")
-                opciones = {
-                    "1": "Guardar la cuerda",
-                    "2": "Volver al bosque",
-                }
+                if "Cuerda" in self._objetos_del_jugador():
+                    print("El sitio donde estaba la cuerda está vacío: ya la recogiste.")
+                    opciones = {"1": "Volver al bosque"}
+                else:
+                    print("Junto a la puerta hay una cuerda bien conservada.")
+                    opciones = {
+                        "1": "Recoger la cuerda",
+                        "2": "Volver al bosque",
+                    }
                 eleccion = self._elegir_opcion(opciones)
                 if eleccion == "0":
                     self._guardar_escena(escena)
                     print("\nTu progreso quedó a salvo. Te espero cuando quieras volver.")
                     return
                 self._guardar_decision(opciones[eleccion], escena)
-                if eleccion == "1":
+                if opciones[eleccion] == "Recoger la cuerda":
                     self._agregar_objeto("Cuerda")
                 escena = "bosque"
 
             elif escena == "torre":
-                print("\nEn lo alto de la torre encuentras un mapa antiguo.")
-                opciones = {
-                    "1": "Llevarte el mapa",
-                    "2": "Regresar al bosque",
-                }
+                if "Mapa antiguo" in self._objetos_del_jugador():
+                    print("\nEn lo alto de la torre, el sitio del mapa está vacío: ya lo recogiste.")
+                    opciones = {"1": "Regresar al bosque"}
+                else:
+                    print("\nEn lo alto de la torre encuentras un mapa antiguo.")
+                    opciones = {
+                        "1": "Recoger el mapa",
+                        "2": "Regresar al bosque",
+                    }
                 eleccion = self._elegir_opcion(opciones)
                 if eleccion == "0":
                     self._guardar_escena(escena)
                     print("\nTu progreso quedó a salvo. Te espero cuando quieras volver.")
                     return
                 self._guardar_decision(opciones[eleccion], escena)
-                if eleccion == "1":
+                if opciones[eleccion] == "Recoger el mapa":
                     self._agregar_objeto("Mapa antiguo")
                 escena = "bosque"
 
